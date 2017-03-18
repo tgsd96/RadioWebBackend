@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/julienschmidt/httprouter"
@@ -109,6 +110,6 @@ func main() {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	handler := cors.Default().Handler(router)
-	log.Fatal(http.ListenAndServeTLS(":8080", "./cert.pem", "./key.pem", handler))
+	log.Fatal(http.ListenAndServeTLS(":"+os.Getenv("PORT"), "./cert.pem", "./key.pem", handler))
 	fmt.Println("How are you?")
 }
