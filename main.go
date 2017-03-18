@@ -110,6 +110,6 @@ func main() {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	handler := cors.Default().Handler(router)
-	log.Fatal(http.ListenAndServeTLS(":"+os.Getenv("PORT"), "./cert.pem", "./key.pem", handler))
+	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), handler))
 	fmt.Println("How are you?")
 }
