@@ -116,6 +116,7 @@ func createUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		"',salt='we232d', prof='" + newUser.Prof + "';"
 	q, err := database.Exec(sql)
 	if err != nil {
+		fmt.Printf("Error creating user: %s", err.Error)
 		response.Message = err.Error()
 	} else {
 		response.Message = "Success"
