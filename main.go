@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+
+	"io/ioutil"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/julienschmidt/httprouter"
@@ -22,6 +23,7 @@ type Signin struct {
 
 type Response struct {
 	Message string `json:"message"`
+	Token   string `json:"token"`
 }
 
 type User struct {
@@ -34,6 +36,11 @@ type User struct {
 type Users struct {
 	Users []User `json:"users"`
 }
+type config struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Db       string `json:"db"`
+}
 
 const (
 	serverName   = "localhost"
@@ -44,12 +51,28 @@ const (
 )
 
 func StartServer() {
-	//Exported function
-	db, err := sql.Open("mysql", "root:!lscd@/RadioWeb_Dev")
-	if err != nil {
 
+	//use config file
+	file, err := ioutil.ReadFile("../configurations.json")
+	if err != nil {
+		db, err := sql.Open("mysql", "root:!lscd@/RadioWeb_Dev")
+		database = db
+		if err != nil {
+			fmt.Printf("Error while connecting to db: %s", err.Error())
+		}
+	} else {
+		var dbconfig config
+		json.Unmarshal(file, &dbconfig)
+		// fmt.Printf("%v\n", dbconfig)
+		db, err := sql.Open("mysql", dbconfig.User+":"+dbconfig.Password+"@/"+dbconfig.Db)
+		if err != nil {
+			fmt.Printf("Error while connecting to db: %s", err.Error())
+		}
+		database = db
 	}
-	database = db
+
+	//Exported function
+
 }
 
 func parsePost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -68,8 +91,10 @@ func parsePost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	fmt.Printf("\nThe username is: " + user.Password)
 	if t.Password == user.Password {
 		response.Message = "Correct Password"
+		response.Token = "1221ewadasa"
 	} else {
 		response.Message = "Incorrect Password"
+		response.Token = ""
 	}
 	output, _ := json.Marshal(response)
 	fmt.Fprint(w, string(output))
@@ -88,7 +113,7 @@ func createUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		"',first='" + newUser.First +
 		"',last='" + newUser.Last +
 		"',password='" + newUser.Password +
-		"',salt='we232d', Prof='" + newUser.Prof + "';"
+		"',salt='we232d', prof='" + newUser.Prof + "';"
 	q, err := database.Exec(sql)
 	if err != nil {
 		response.Message = err.Error()
@@ -110,6 +135,6 @@ func main() {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	handler := cors.Default().Handler(router)
-	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), handler))
-	fmt.Println("How are you?")
+	log.Fatal(http.ListenAndServeTLS(":8080", "./cert.pem", "./key.pem", handler))
+	//fmt.Println("How are you?")
 }
