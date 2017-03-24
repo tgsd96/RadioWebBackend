@@ -199,6 +199,7 @@ func parsePost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		response.Token = ""
 	}
 	output, _ := json.Marshal(response)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, string(output))
 }
 
@@ -273,10 +274,12 @@ func main() {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	handler := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedHeaders: []string{"Authorization"},
-		AllowedMethods: []string{"GET", "POST"},
+		AllowedOrigins:   []string{"*"},
+		AllowedHeaders:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowCredentials: true,
 	})
+	// handler := cors.Default()
 	handle := handler.Handler(router)
 	log.Fatal(http.ListenAndServeTLS(":8080", "./cert.pem", "./key.pem", handle))
 }
