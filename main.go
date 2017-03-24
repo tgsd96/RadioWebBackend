@@ -52,6 +52,19 @@ type config struct {
 	Db       string `json:"db"`
 }
 
+type Datasets struct {
+	Datasets []Dataset `json:"datasets"`
+}
+
+type Dataset struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"description"`
+	URL  string `json:"datasetUrl"`
+	Cost string `json:"cost"`
+	Date string `json:"date"`
+}
+
 const (
 	serverName   = "localhost"
 	SSLport      = ":433"
@@ -63,9 +76,9 @@ const (
 func StartServer() {
 
 	//use config file
-	file, err := ioutil.ReadFile("../configurations.json")
+	file, err := ioutil.ReadFile("/etc/radioweb/configurations.json")
 	if err != nil {
-		db, err := sql.Open("mysql", "root:!lscd@/RadioWeb_Dev")
+		db, err := sql.Open("mysql", "root:@/RadioWeb_Dev")
 		database = db
 		if err != nil {
 			fmt.Printf("Error while connecting to db: %s", err.Error())
@@ -83,6 +96,28 @@ func StartServer() {
 
 	//Exported function
 
+}
+func decryptToken(getToken string) int64 {
+	token, _ := jwt.Parse(getToken, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return secretKey, nil
+	})
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		fmt.Println(claims["uid"])
+		id, err := claims["uid"].(int64)
+		if err != true {
+			fmt.Println("Error reading claims")
+		}
+		return id
+		// return int64(id)
+		// fmt.Println(claims["uid"])
+	}
+	return -1
 }
 
 func redirectNonSecure(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +138,40 @@ func getToken(userid int64) string {
 
 	}
 	return jwtToken
+}
+func returnDatasetList(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	fmt.Printf("\n Requess for datasets found")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	token := r.Header.Get("Authorization")
+	// token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE0OTAzMDI4MzYsImlhdCI6MTQ5MDIxNjQzNiwidWlkIjo1fQ.E_6tzzQCLtJ1dlFMWLTP8VgH4B8qD9kia9v1iepeP9E"
+	uid := decryptToken(token)
+	if uid == -1 {
+		var response Response
+		response.Message = "Retry login"
+		output, _ := json.Marshal(response)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, string(output))
+		// fmt.Fprintf(w, "Retry login")
+	} else {
+		rows, err := database.Query("select * from availDatasets")
+		if err != nil {
+			fmt.Printf("\n Error quering database %s", err.Error())
+		}
+		Response := Datasets{}
+		for rows.Next() {
+			dataset := Dataset{}
+			rows.Scan(&dataset.ID, &dataset.Name, &dataset.Desc, &dataset.URL, &dataset.Cost, &dataset.Date)
+			Response.Datasets = append(Response.Datasets, dataset)
+		}
+
+		output, _ := json.Marshal(Response)
+		fmt.Fprintln(w, string(output))
+	}
+
+}
+
+func storeImages(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+
 }
 func parsePost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
@@ -176,7 +245,7 @@ func createUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		"',salt='" + salt + "', prof='" + newUser.Prof + "';"
 	q, err := database.Exec(sql)
 	if err != nil {
-		fmt.Printf("Error creating user: %s", err.Error)
+		fmt.Printf("Error creating user: %s", err.Error())
 		response.Message = err.Error()
 		response.Token = ""
 	} else {
@@ -196,12 +265,18 @@ func main() {
 	router := httprouter.New()
 	router.POST("/api/test", parsePost)
 	router.POST("/api/register", createUser)
+	router.GET("/api/datasets", returnDatasetList)
 	router.POST("/api/token", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	router.GET("/api/view", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		fmt.Fprintf(w, "Hello,world")
 	})
-	handler := cors.Default().Handler(router)
-	log.Fatal(http.ListenAndServeTLS(":8080", "./cert.pem", "./key.pem", handler))
+	handler := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"Authorization"},
+		AllowedMethods: []string{"GET", "POST"},
+	})
+	handle := handler.Handler(router)
+	log.Fatal(http.ListenAndServeTLS(":8080", "./cert.pem", "./key.pem", handle))
 }
