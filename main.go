@@ -274,9 +274,9 @@ func main() {
 		fmt.Fprintf(w, "Hello,world")
 	})
 	handler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"Authorization"},
+		AllowedOrigins:   []string{"*"},
 		AllowedHeaders:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST"},
 		AllowCredentials: true,
 	})
 	// handler := cors.Default()
